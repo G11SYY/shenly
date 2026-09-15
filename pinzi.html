@@ -1,0 +1,1288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>古诗拼字 · 三层拼字</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'KaiTi', '华文楷体', '宋体', 'Microsoft YaHei', serif;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;   /* 去掉点击蓝色遮罩 */
+            -webkit-touch-callout: none;
+        }
+
+                button, .piece, .level-btn, .main-button, .back-btn, .btn-restart, .btn-exit, .modal-btn {
+            -webkit-tap-highlight-color: transparent;
+            outline: none;
+        }
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: #2e3b4e;
+            padding: 0;
+            margin: 0;
+        }
+
+        #game-container {
+            width: 100vw;
+            height: 100vh;
+            max-width: 100vw;
+            max-height: 100vh;
+            background: #f3efe6;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            padding: 20px 24px;
+            transition: opacity 0.25s ease;
+            background: #f3efe6;
+        }
+
+         .piece.selected {
+            background: #ffd98a;
+            border-color: #b8860b;
+            box-shadow: 0 4px 0 #a67c00, 0 0 0 4px rgba(200, 150, 50, 0.5);
+            transform: translateY(-3px) scale(1.05);
+        }
+        .hidden {
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s;
+        }
+
+        /* ================= 主界面 ================= */
+        #main-screen {
+            justify-content: center;
+            align-items: center;
+            background: url('bg.jpg') center center / cover no-repeat;
+            background-color: #e6dfd1;
+        }
+
+        .main-button {
+            background: rgba(184, 166, 139, 0.95);
+            border: 3px solid #fef9e8;
+            border-radius: 80px;
+            padding: 24px 64px;
+            font-size: 48px;
+            font-weight: bold;
+            color: #fef9e8;
+            text-shadow: 3px 3px 0 #7a6a58;
+            box-shadow: 0 12px 0 #7a6a58, 0 15px 20px rgba(0, 0, 0, 0.3);
+            letter-spacing: 8px;
+            cursor: pointer;
+            transition: all 0.08s linear;
+            font-family: 'KaiTi', '华文楷体', serif;
+            transform: translateY(-4px);
+        }
+
+        .main-button:active {
+            box-shadow: 0 6px 0 #7a6a58, 0 10px 15px rgba(0, 0, 0, 0.3);
+            transform: translateY(6px);
+        }
+
+        /* ================= 选关界面 ================= */
+        #select-screen {
+            background: url('bg.jpg') center center / cover no-repeat;
+            background-color: #e8e0d3;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* 半透明遮罩 */
+        #select-screen::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 250, 240, 0.4);
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        /* 选关界面里的内容要放在遮罩之上，但返回按钮要绝对定位 */
+        #select-screen > .level-buttons {
+            position: relative;
+            z-index: 1;
+        }
+
+        /* 返回按钮 - 左上角（放大） */
+        .back-btn {
+            position: absolute;
+            top: 20px;
+            left: 18px;
+            background: rgba(184, 166, 139, 0.95);
+            border: none;
+            padding: 12px 24px;
+            border-radius: 40px;
+            font-size: 20px;
+            font-weight: bold;
+            color: #2e241b;
+            letter-spacing: 1px;
+            box-shadow: 0 5px 0 #7a6a58;
+            cursor: pointer;
+            transition: all 0.08s;
+            font-family: 'KaiTi', serif;
+            transform: translateY(-2px);
+            z-index: 10;
+        }
+
+        .back-btn:active {
+            box-shadow: 0 2px 0 #7a6a58;
+            transform: translateY(2px);
+        }
+
+        /* 选关滚动容器 */
+        .level-scroll {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            overflow-y: auto;
+            overflow-x: hidden;
+            -webkit-overflow-scrolling: touch;   /* iOS 顺滑滚动 */
+            padding: 90px 20px 40px 20px;        /* 顶部留出返回按钮的空间 */
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+        }
+
+        /* 隐藏滚动条 */
+        .level-scroll::-webkit-scrollbar {
+            display: none;
+        }
+
+        /* 选关按钮组 */
+        .level-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 18px;
+            width: 100%;
+            max-width: 500px;
+        }
+
+        /* 关卡按钮 - 缩小到原来一半 */
+        .level-btn {
+            width: 60px;
+            height: 60px;
+            border-radius: 18px;
+            background: #cdba9f;
+            border: none;
+            font-size: 26px;
+            font-weight: bold;
+            color: #3a2f23;
+            box-shadow: 0 5px 0 #8f7a63, 0 6px 10px rgba(0, 0, 0, 0.2);
+            cursor: pointer;
+            transition: all 0.08s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'KaiTi', serif;
+            transform: translateY(-2px);
+        }
+
+        .level-btn:active {
+            box-shadow: 0 2px 0 #8f7a63;
+            transform: translateY(3px);
+        }
+
+        /* ================= 关卡界面 ================= */
+        #play-screen {
+            padding: 12px 16px;
+            display: flex;
+            flex-direction: column;
+            background: #f3efe6;
+        }
+
+        .top-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #d9cdb9;
+            padding: 8px 16px;
+            border-radius: 50px;
+            margin-bottom: 10px;
+            box-shadow: inset 0 2px 6px rgba(88, 68, 48, 0.2), 0 4px 8px rgba(0, 0, 0, 0.1);
+            flex-shrink: 0;
+        }
+
+        .btn-restart, .btn-exit {
+            background: #b8a68b;
+            border: none;
+            padding: 8px 22px;
+            border-radius: 40px;
+            font-size: 20px;
+            font-weight: bold;
+            color: #2e241b;
+            letter-spacing: 2px;
+            box-shadow: 0 5px 0 #7a6a58;
+            cursor: pointer;
+            transition: all 0.08s;
+            font-family: 'KaiTi', serif;
+            transform: translateY(-2px);
+            min-width: 90px;
+        }
+
+        .btn-restart:active, .btn-exit:active {
+            box-shadow: 0 2px 0 #7a6a58;
+            transform: translateY(3px);
+        }
+
+        .timer {
+            font-size: 32px;
+            font-weight: bold;
+            color: #3a2e24;
+            background: #f0e8da;
+            padding: 4px 26px;
+            border-radius: 40px;
+            box-shadow: inset 0 0 0 2px #baa78e, inset 0 4px 8px rgba(0,0,0,0.1);
+            font-family: 'Courier New', monospace;
+            letter-spacing: 2px;
+            text-shadow: 1px 1px 0 #d9cdb9;
+            font-variant-numeric: tabular-nums;
+            min-width: 120px;
+            text-align: center;
+            display: inline-block;
+        }
+
+        /* 古诗展示 - 占屏幕 1/2，不滑动 */
+        .poem-area {
+            flex: 1.5;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            align-items: center;
+            background: #fffcf2;
+            border-radius: 28px;
+            padding: 4px 3px;
+            margin-bottom: 30px;        /* 中间空隙 */
+            box-shadow: inset 0 0 0 3px #d6c6b2, 0 8px 12px rgba(0, 0, 0, 0.1);
+            min-height: 0;
+            overflow: hidden;
+        }
+
+        /* 古诗标题 */
+        .poem-title {
+            font-size: 15px;
+            font-weight: bold;
+            color: #8a6a4a;
+            text-align: center;
+            margin-bottom: 1px;
+            letter-spacing: 1px;
+            text-shadow: 1px 1px 0 #e6d6c0;
+            flex-shrink: 0;
+        }
+
+        .poem-line {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 0px 1px;
+            font-size: 14px;
+            line-height: 1.2;
+            color: #cfc3b0;
+            transition: color 0.3s, text-shadow 0.3s;
+            font-weight: 600;
+            letter-spacing: 0;
+            text-shadow: 1px 1px 0 #e0d6c8;
+        }
+
+        .poem-char {
+            display: inline-block;
+            transition: color 0.35s, text-shadow 0.35s;
+            color: #cfc3b0;
+            font-size: 14px;
+            min-width: 15px;
+            text-align: center;
+            padding: 0;
+        }
+
+        .poem-char.lit {
+            color: #ad6b3e;
+            text-shadow: 0 0 4px #f7d9a0, 1px 1px 0 #fff3e0;
+            font-weight: 700;
+        }
+        /* 拆字部件区 - 占屏幕 1/2，三层叠放 */
+        .pieces-area {
+            flex: 1.5;
+            position: relative;
+            background: #e6daca;
+            border-radius: 28px;
+            padding: 8px;
+            box-shadow: inset 0 0 0 3px #cbb99f, inset 0 6px 12px rgba(90, 70, 50, 0.2);
+            overflow: hidden;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;   /* 部件从顶部开始 */
+        }
+
+        /* 每一层：绝对定位叠在一起 */
+        .piece-layer {
+            position: absolute;
+            top: 4px;
+            left: 4px;
+            right: 4px;
+            bottom: 4px;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: flex-start;
+            align-content: flex-start;
+            gap: 0;                      /* 无空隙 */
+            padding: 0;
+            border-radius: 18px;
+            transition: opacity 0.35s, filter 0.35s;
+            overflow: hidden;
+        }
+
+        /* 当前层：亮、可点 */
+        .piece-layer.active {
+            opacity: 1;
+            z-index: 3;
+            pointer-events: auto;
+        }
+
+        /* 已完成的层：完全透明 */
+        .piece-layer.completed {
+            opacity: 0;
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        /* 未解锁的层：暗、不可点 */
+        .piece-layer.locked {
+            opacity: 0.25;
+            z-index: 2;
+            pointer-events: none;
+            filter: grayscale(0.8);
+        }
+
+        /* 部件方格 - 再缩小，无空隙 */
+        .piece {
+            display: inline-flex;
+            flex-direction: row;
+            align-items: center;
+            justify-content: center;
+            background: #fcf7ed;
+            border-radius: 6px;
+            padding: 0;
+            box-shadow: 0 2px 0 #a58d73;
+            cursor: pointer;
+            transition: all 0.1s ease;
+            font-size: 18px;
+            color: #3f3226;
+            font-weight: 600;
+            border: 1px solid #cdba9f;
+            width: 36px;
+            height: 36px;
+            margin: 0;
+            box-sizing: border-box;
+        }
+        .piece:active {
+            box-shadow: 0 1px 0 #a58d73;
+            transform: translateY(2px);
+        }
+
+        .piece.selected {
+            background: #ffd98a;
+            border-color: #b8860b;
+            box-shadow: 0 3px 0 #a67c00, 0 0 0 3px rgba(200, 150, 50, 0.5);
+            transform: translateY(-2px) scale(1.05);
+        }
+
+        .piece .part {
+            display: inline-block;
+            font-size: 18px;
+            line-height: 1;
+        }
+        /* 飞行动画 */
+        .fly-char {
+            position: fixed;
+            font-size: 42px;
+            font-weight: bold;
+            color: #ad6b3e;
+            text-shadow: 0 0 12px #f7d9a0;
+            pointer-events: none;
+            z-index: 9999;
+            transition: all 0.45s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+            opacity: 1;
+            font-family: 'KaiTi', serif;
+        }
+
+        /* 通关弹窗 */
+        .modal-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(40, 30, 20, 0.5);
+            backdrop-filter: blur(3px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal-box {
+            background: #fef9ed;
+            padding: 40px 60px;
+            border-radius: 60px;
+            box-shadow: 0 20px 30px rgba(0, 0, 0, 0.4), inset 0 0 0 5px #dac09c;
+            text-align: center;
+            border: 2px solid #b8a68b;
+        }
+
+        .modal-box h2 {
+            font-size: 48px;
+            color: #6f523b;
+            margin-bottom: 30px;
+            text-shadow: 2px 2px 0 #e6d6c0;
+            letter-spacing: 4px;
+        }
+
+        .modal-btn {
+            background: #b8a68b;
+            border: none;
+            padding: 18px 60px;
+            font-size: 32px;
+            border-radius: 40px;
+            color: #2c241c;
+            font-weight: bold;
+            box-shadow: 0 8px 0 #7a6a58;
+            cursor: pointer;
+            transition: all 0.08s;
+            font-family: 'KaiTi', serif;
+            transform: translateY(-3px);
+        }
+
+        .modal-btn:active {
+            box-shadow: 0 3px 0 #7a6a58;
+            transform: translateY(5px);
+        }
+
+        .hidden-modal {
+            display: none;
+        }
+
+        .hint {
+            font-size: 13px;
+            color: #8a7a66;
+            margin-top: 6px;
+            text-align: center;
+            flex-shrink: 0;
+        }
+    </style>
+</head>
+<body>
+<div id="game-container">
+    <!-- 主界面 -->
+    <div id="main-screen" class="screen">
+        <button class="main-button" id="startBtn">开始</button>
+    </div>
+
+    <!-- 选关界面 -->
+    <div id="select-screen" class="screen hidden">
+        <button class="back-btn" id="backToMainBtn">← 返回</button>
+        <div class="level-scroll">
+            <div class="level-buttons" id="levelButtons"></div>
+        </div>
+    </div>
+
+    <!-- 关卡游玩界面 -->
+    <div id="play-screen" class="screen hidden">
+        <div class="top-bar">
+            <button class="btn-restart" id="restartBtn">重开</button>
+            <div class="timer" id="timerDisplay">0:00</div>
+            <button class="btn-exit" id="exitBtn">退出</button>
+        </div>
+        <div class="poem-area" id="poemArea"></div>
+        <div class="pieces-area" id="piecesArea"></div>
+        <div class="hint">点击亮的部件，集齐一个字的所有部件即可拼合</div>
+    </div>
+
+    <!-- 通关弹窗 -->
+    <div id="winModal" class="modal-overlay hidden-modal">
+        <div class="modal-box">
+            <h2>🎉 通关 🎉</h2>
+            <button class="modal-btn" id="nextLevelBtn">下一关</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    (function(){
+        // ================= 古诗库 =================
+        const POEMS = [
+            {
+                title: "岳阳楼记",
+                lines: [
+                    "庆历四年春，滕子京谪守巴陵郡。越明年，政通人和，百废具兴，乃重修岳阳楼，增其旧制，刻唐贤今人诗赋于其上，属予作文以记之。",
+                    "予观夫巴陵胜状，在洞庭一湖。衔远山，吞长江，浩浩汤汤，横无际涯，朝晖夕阴，气象万千，此则岳阳楼之大观也，前人之述备矣。然则北通巫峡，南极潇湘，迁客骚人，多会于此，览物之情，得无异乎？",
+                    "若夫霪雨霏霏，连月不开，阴风怒号，浊浪排空，日星隐耀，山岳潜形，商旅不行，樯倾楫摧，薄暮冥冥，虎啸猿啼。登斯楼也，则有去国怀乡，忧谗畏讥，满目萧然，感极而悲者矣。",
+                    "至若春和景明，波澜不惊，上下天光，一碧万顷，沙鸥翔集，锦鳞游泳，岸芷汀兰，郁郁青青。而或长烟一空，皓月千里，浮光跃金，静影沉璧，渔歌互答，此乐何极！登斯楼也，则有心旷神怡，宠辱偕忘，把酒临风，其喜洋洋者矣。",
+                    "嗟夫！予尝求古仁人之心，或异二者之为，何哉？不以物喜，不以己悲，居庙堂之高则忧其民，处江湖之远则忧其君。是进亦忧，退亦忧。然则何时而乐耶？其必曰“先天下之忧而忧，后天下之乐而乐”乎！噫！微斯人，吾谁与归？时六年九月十五日。"
+                ]
+            },
+            {
+                title: "登鹳雀楼",
+                lines: [
+                    "白日依山尽，黄河入海流。",
+                    "欲穷千里目，更上一层楼。"
+                ]
+            },
+            {
+                title: "春晓",
+                lines: [
+                    "春眠不觉晓，处处闻啼鸟。",
+                    "夜来风雨声，花落知多少。"
+                ]
+            },
+            {
+                title: "清明",
+                lines: [
+                    "清明时节雨纷纷，路上行人欲断魂。",
+                    "借问酒家何处有，牧童遥指杏花村。"
+                ]
+            },
+            {
+                title: "绝句",
+                lines: [
+                    "两个黄鹂鸣翠柳，一行白鹭上青天。",
+                    "窗含西岭千秋雪，门泊东吴万里船。"
+                ]
+            }
+        ];
+
+        // ================= 汉字拆解表（岳阳楼记全 + 其他关） =================
+        const CHAR_DECOMPOSE = {
+            // ========== 岳阳楼记（第一关，整篇） ==========
+            // 第一段
+            '庆': ['广', '大'],
+            '历': ['厂', '力'],
+            '四': ['四'],
+            '年': ['丿', '干'],
+            '春': ['𡗗', '日'],
+            '滕': ['月', '关', '水'],
+            '子': ['子'],
+            '京': ['亠', '口', '小'],
+            '谪': ['讠', '啇'],
+            '守': ['宀', '寸'],
+            '巴': ['巴'],
+            '陵': ['阝', '夌'],
+            '郡': ['君', '阝'],
+            '越': ['走', '戉'],
+            '明': ['日', '月'],
+            '政': ['正', '攵'],
+            '通': ['辶', '甬'],
+            '人': ['人'],
+            '和': ['禾', '口'],
+            '百': ['一', '白'],
+            '废': ['广', '发'],
+            '具': ['具'],
+            '兴': ['兴'],
+            '乃': ['乃'],
+            '重': ['千', '里'],
+            '修': ['亻', '夂', '彡'],
+            '岳': ['丘', '山'],
+            '阳': ['阝', '日'],
+            '楼': ['木', '娄'],
+            '增': ['土', '曾'],
+            '其': ['其'],
+            '旧': ['丨', '日'],
+            '制': ['牛', '刂', '巾'],
+            '刻': ['亥', '刂'],
+            '唐': ['广', '肀', '口'],
+            '贤': ['竖', '又', '贝'],
+            '今': ['今'],
+            '诗': ['讠', '寺'],
+            '赋': ['贝', '武'],
+            '于': ['一', '十'],
+            '上': ['上'],
+            '属': ['尸', '禹'],
+            '予': ['予'],
+            '作': ['亻', '乍'],
+            '文': ['文'],
+            '以': ['以'],
+            '记': ['讠', '己'],
+            '之': ['之'],
+            '俱': ['亻', '具'],
+
+            // 第二段
+            '观': ['又', '见'],
+            '夫': ['夫'],
+            '胜': ['月', '生'],
+            '状': ['爿', '犬'],
+            '在': ['才', '土'],
+            '洞': ['氵', '同'],
+            '庭': ['广', '廷'],
+            '一': ['一'],
+            '湖': ['氵', '胡'],
+            '衔': ['行', '金'],
+            '远': ['辶', '元'],
+            '山': ['山'],
+            '吞': ['天', '口'],
+            '长': ['长'],
+            '江': ['氵', '工'],
+            '浩': ['氵', '告'],
+            '汤': ['氵', '昜'],
+            '横': ['木', '黄'],
+            '无': ['无'],
+            '际': ['阝', '祭'],
+            '涯': ['氵', '厓'],
+            '朝': ['龺', '月'],
+            '晖': ['日', '军'],
+            '夕': ['夕'],
+            '阴': ['阝', '月'],
+            '气': ['气'],
+            '象': ['⺈', '豕'],
+            '万': ['万'],
+            '千': ['丿', '十'],
+            '此': ['止', '匕'],
+            '则': ['贝', '刂'],
+            '大': ['大'],
+            '也': ['也'],
+            '前': ['䒑', '月', '刂'],
+            '述': ['辶', '术'],
+            '备': ['夂', '田'],
+            '矣': ['厶', '矢'],
+            '然': ['月', '犬', '灬'],
+            '北': ['北'],
+            '巫': ['工', '从'],
+            '峡': ['山', '夹'],
+            '南': ['十', '冂', '丷', '干'],
+            '极': ['木', '及'],
+            '潇': ['氵', '萧'],
+            '湘': ['氵', '相'],
+            '迁': ['千', '辶'],
+            '客': ['宀', '各'],
+            '骚': ['马', '蚤'],
+            '多': ['多'],
+            '会': ['人', '云'],
+            '览': ['监', '见'],
+            '物': ['牛', '勿'],
+            '情': ['忄', '青'],
+            '得': ['彳', '日', '寸'],
+            '异': ['巳', '廾'],
+            '乎': ['乎'],
+
+            // 第三段
+            '若': ['艹', '右'],
+            '霪': ['雨', '淫'],
+            '雨': ['雨'],
+            '霏': ['雨', '非'],
+            '连': ['辶', '车'],
+            '月': ['月'],
+            '不': ['一', '个'],
+            '开': ['一', '廾'],
+            '风': ['几', '乂'],
+            '怒': ['女', '又', '心'],
+            '号': ['口', '丂'],
+            '浊': ['氵', '虫'],
+            '浪': ['氵', '良'],
+            '排': ['扌', '非'],
+            '空': ['穴', '工'],
+            '日': ['日'],
+            '星': ['日', '生'],
+            '隐': ['阝', '急'],
+            '耀': ['光', '翟'],
+            '潜': ['氵', '替'],
+            '形': ['开', '彡'],
+            '商': ['亠', '丷', '冂', '口'],
+            '旅': ['方', '𠂉', '氏'],
+            '行': ['彳', '亍'],
+            '樯': ['木', '啬'],
+            '倾': ['亻', '顷'],
+            '楫': ['木', '咠'],
+            '摧': ['扌', '崔'],
+            '薄': ['艹', '溥'],
+            '暮': ['莫', '日'],
+            '冥': ['冖', '日', '六'],
+            '虎': ['虍', '几'],
+            '啸': ['口', '肃'],
+            '猿': ['犭', '袁'],
+            '啼': ['口', '帝'],
+            '登': ['癶', '豆'],
+            '斯': ['其', '斤'],
+            '有': ['有'],
+            '去': ['土', '厶'],
+            '国': ['囗', '玉'],
+            '怀': ['忄', '不'],
+            '乡': ['乡'],
+            '忧': ['忄', '尤'],
+            '谗': ['讠', '毚'],
+            '畏': ['田', '衣'],
+            '讥': ['讠', '几'],
+            '满': ['氵', '艹', '两'],
+            '目': ['目'],
+            '萧': ['艹', '肃'],
+            '感': ['咸', '心'],
+            '而': ['而'],
+            '悲': ['非', '心'],
+            '者': ['老', '日'],
+            '淫': ['氵', '淫'],
+            '曜': ['日', '翟'],
+
+            // 第四段
+            '至': ['一', '厶', '土'],
+            '景': ['日', '京'],
+            '波': ['氵', '皮'],
+            '澜': ['氵', '阑'],
+            '惊': ['忄', '京'],
+            '下': ['一', '卜'],
+            '天': ['一', '大'],
+            '光': ['⺌', '儿'],
+            '碧': ['王', '白', '石'],
+            '顷': ['匕', '页'],
+            '沙': ['氵', '少'],
+            '鸥': ['区', '鸟'],
+            '翔': ['羊', '羽'],
+            '集': ['隹', '木'],
+            '锦': ['钅', '帛'],
+            '鳞': ['鱼', '粦'],
+            '游': ['氵', '斿'],
+            '泳': ['氵', '永'],
+            '岸': ['山', '厂', '干'],
+            '芷': ['艹', '止'],
+            '汀': ['氵', '丁'],
+            '兰': ['丷', '三'],
+            '郁': ['有', '阝'],
+            '青': ['青'],
+            '或': ['戈', '口', '一'],
+            '烟': ['火', '因'],
+            '皓': ['白', '告'],
+            '里': ['里'],
+            '浮': ['氵', '孚'],
+            '跃': ['足', '夭'],
+            '金': ['金'],
+            '静': ['青', '争'],
+            '影': ['日', '京', '彡'],
+            '沉': ['氵', '冘'],
+            '璧': ['辟', '玉'],
+            '渔': ['氵', '鱼'],
+            '歌': ['哥', '欠'],
+            '互': ['互'],
+            '答': ['⺮', '合'],
+            '乐': ['乐'],
+            '何': ['亻', '可'],
+            '心': ['心'],
+            '旷': ['日', '广'],
+            '神': ['礻', '申'],
+            '怡': ['忄', '台'],
+            '宠': ['宀', '龙'],
+            '辱': ['辰', '寸'],
+            '偕': ['亻', '皆'],
+            '忘': ['亡', '心'],
+            '把': ['扌', '巴'],
+            '酒': ['氵', '酉'],
+            '临': ['刂', '𠂉', '口'],
+            '喜': ['士', '口', '丷', '一'],
+            '洋': ['氵', '羊'],
+
+            // 第五段
+            '嗟': ['口', '差'],
+            '尝': ['小', '冖', '云'],
+            '求': ['求'],
+            '古': ['十', '口'],
+            '仁': ['亻', '二'],
+            '二': ['二'],
+            '为': ['为'],
+            '哉': ['土', '戈', '口'],
+            '己': ['己'],
+            '居': ['尸', '古'],
+            '庙': ['广', '由'],
+            '堂': ['尚', '土'],
+            '高': ['高'],
+            '民': ['民'],
+            '处': ['夂', '卜'],
+            '君': ['尹', '口'],
+            '是': ['日', '正'],
+            '进': ['辶', '井'],
+            '亦': ['亦'],
+            '退': ['辶', '艮'],
+            '耶': ['耳', '阝'],
+            '必': ['心', '丿'],
+            '曰': ['日'],
+            '先': ['牛', '儿'],
+            '后': ['厂', '口'],
+            '噫': ['口', '意'],
+            '微': ['彳', '山', '几', '攵'],
+            '吾': ['五', '口'],
+            '谁': ['讠', '隹'],
+            '与': ['与'],
+            '归': ['归'],
+            '时': ['日', '寸'],
+            '六': ['六'],
+            '九': ['九'],
+            '十': ['十'],
+            '五': ['五'],
+
+            // ========== 登鹳雀楼（第二关） ==========
+            '白': ['白'],
+            '依': ['亻', '衣'],
+            '尽': ['尺', '丶'],
+            '黄': ['黄'],
+            '河': ['氵', '可'],
+            '入': ['入'],
+            '海': ['氵', '每'],
+            '流': ['氵', '㐬'],
+            '欲': ['谷', '欠'],
+            '穷': ['穴', '力'],
+            '更': ['更'],
+            '层': ['尸', '云'],
+
+            // ========== 春晓（第三关） ==========
+            '眠': ['目', '民'],
+            '觉': ['⺍', '冖', '见'],
+            '晓': ['日', '尧'],
+            '闻': ['门', '耳'],
+            '鸟': ['鸟'],
+            '夜': ['亠', '亻', '夕'],
+            '来': ['一', '米'],
+            '声': ['士', '眉'],
+            '花': ['艹', '化'],
+            '落': ['艹', '洛'],
+            '知': ['矢', '口'],
+            '少': ['小', '丿'],
+
+            // ========== 清明（第四关） ==========
+            '清': ['氵', '青'],
+            '节': ['⺮', '即'],
+            '纷': ['纟', '分'],
+            '路': ['足', '各'],
+            '断': ['㡭', '斤'],
+            '魂': ['云', '鬼'],
+            '借': ['亻', '昔'],
+            '问': ['门', '口'],
+            '家': ['宀', '豕'],
+            '牧': ['牛', '攵'],
+            '童': ['立', '里'],
+            '遥': ['辶', '摇'],
+            '指': ['扌', '旨'],
+            '杏': ['木', '口'],
+            '村': ['木', '寸'],
+
+            // ========== 绝句（第五关） ==========
+            '两': ['两'],
+            '个': ['个'],
+            '鹂': ['丽', '鸟'],
+            '鸣': ['口', '鸟'],
+            '翠': ['羽', '卒'],
+            '柳': ['木', '卯'],
+            '鹭': ['路', '鸟'],
+            '窗': ['穴', '囱'],
+            '含': ['今', '口'],
+            '西': ['西'],
+            '岭': ['山', '令'],
+            '秋': ['禾', '火'],
+            '雪': ['雨', '彐'],
+            '门': ['门'],
+            '泊': ['氵', '白'],
+            '东': ['东'],
+            '吴': ['口', '天'],
+            '船': ['舟', '㕣'],
+
+            // ========== 标点（不拆，但保留） ==========
+            '，': ['，'],
+            '。': ['。'],
+            '？': ['？'],
+            '！': ['！'],
+            '：': ['：'],
+            '“': ['“'],
+            '”': ['”'],
+            '(': ['('],
+            ')': [')'],
+        };
+
+        function getCharParts(ch) {
+            if (CHAR_DECOMPOSE[ch]) return CHAR_DECOMPOSE[ch];
+            return [ch];
+        }
+
+        // ================= 状态 =================
+        let currentLevel = 0;
+        let timerInterval = null;
+        let secondsElapsed = 0;
+        let currentPoemChars = [];
+        let currentLayer = 0;
+        let totalLayers = 3;
+        let layerUnsolved = [];
+        let layerPieceContainers = [];
+        let charProgress = {};
+        let charPieceEls = {};
+
+        // DOM
+        const mainScreen = document.getElementById('main-screen');
+        const selectScreen = document.getElementById('select-screen');
+        const playScreen = document.getElementById('play-screen');
+        const levelButtons = document.getElementById('levelButtons');
+        const startBtn = document.getElementById('startBtn');
+        const restartBtn = document.getElementById('restartBtn');
+        const exitBtn = document.getElementById('exitBtn');
+        const timerDisplay = document.getElementById('timerDisplay');
+        const poemArea = document.getElementById('poemArea');
+        const piecesArea = document.getElementById('piecesArea');
+        const winModal = document.getElementById('winModal');
+        const nextLevelBtn = document.getElementById('nextLevelBtn');
+
+        // ================= 计时器 =================
+        function formatTime(sec) {
+            const m = Math.floor(sec / 60);
+            const s = sec % 60;
+            return `${m}:${s < 10 ? '0' : ''}${s}`;
+        }
+
+        function stopTimer() {
+            if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+        }
+
+        function startTimer() {
+            stopTimer();
+            secondsElapsed = 0;
+            timerDisplay.textContent = '0:00';
+            timerInterval = setInterval(() => {
+                secondsElapsed++;
+                timerDisplay.textContent = formatTime(secondsElapsed);
+            }, 1000);
+        }
+
+        function resetTimer() {
+            stopTimer();
+            secondsElapsed = 0;
+            timerDisplay.textContent = '0:00';
+        }
+
+        function showScreen(screen) {
+            [mainScreen, selectScreen, playScreen].forEach(s => s.classList.add('hidden'));
+            screen.classList.remove('hidden');
+        }
+
+        // ================= 选关 =================
+        function buildLevelButtons() {
+            levelButtons.innerHTML = '';
+            POEMS.forEach((_, idx) => {
+                const btn = document.createElement('button');
+                btn.className = 'level-btn';
+                btn.textContent = idx + 1;
+                btn.addEventListener('click', () => {
+                    currentLevel = idx;
+                    enterLevel(currentLevel);
+                });
+                levelButtons.appendChild(btn);
+            });
+        }
+
+        // ================= 进入关卡 =================
+        function enterLevel(levelIndex) {
+            stopTimer();
+            resetTimer();
+            winModal.classList.add('hidden-modal');
+            showScreen(playScreen);
+
+            const poem = POEMS[levelIndex];
+            currentLayer = 0;
+
+            // 1. 构建字符信息（跳过标点）
+            currentPoemChars = [];
+            poem.lines.forEach((line, lineIdx) => {
+                for (let i = 0; i < line.length; i++) {
+                    const char = line[i];
+                    // 跳过标点
+                    if ('，。？！、；：'.includes(char)) continue;
+                    currentPoemChars.push({
+                        char: char,
+                        lit: false,
+                        lineIndex: lineIdx,
+                        charIndex: i,
+                        globalIndex: currentPoemChars.length
+                    });
+                }
+            });
+
+            // 2. 初始化进度
+            charProgress = {};
+            charPieceEls = {};
+            currentPoemChars.forEach((_, idx) => {
+                charProgress[idx] = 0;
+                charPieceEls[idx] = [];
+            });
+
+            // 3. 打乱并动态分层（每层最多 60 字，最少 3 层，最多 8 层）
+            const allIndices = currentPoemChars.map((_, idx) => idx);
+            shuffleArray(allIndices);
+            const totalChars = allIndices.length;
+
+            let layerCount = Math.ceil(totalChars / 60);
+            if (layerCount < 3) layerCount = 3;
+            if (layerCount > 8) layerCount = 8;
+            totalLayers = layerCount;
+
+            layerUnsolved = [];
+            for (let i = 0; i < layerCount; i++) {
+                layerUnsolved[i] = new Set();
+            }
+            allIndices.forEach((idx, i) => {
+                const layer = i % layerCount;
+                layerUnsolved[layer].add(idx);
+            });
+
+            // 4. 渲染古诗
+            renderPoem(poem.lines);
+
+            // 5. 渲染部件
+            renderAllLayers(poem.lines);
+
+            // 6. 激活第一层
+            updateLayerStates();
+
+            startTimer();
+        }
+
+        function renderPoem(lines) {
+            poemArea.innerHTML = '';
+
+            // 渲染标题
+            const titleDiv = document.createElement('div');
+            titleDiv.className = 'poem-title';
+            titleDiv.textContent = POEMS[currentLevel].title || '';
+            poemArea.appendChild(titleDiv);
+
+            // 渲染诗句（跳过标点，与 currentPoemChars 索引一致）
+            let globalIdx = 0;
+            lines.forEach((line) => {
+                const lineDiv = document.createElement('div');
+                lineDiv.className = 'poem-line';
+                for (let i = 0; i < line.length; i++) {
+                    const char = line[i];
+                    // 跳过标点
+                    if ('，。？！、；：'.includes(char)) {
+                        // 标点仍然显示，但不作为可拼字，也不占索引
+                        const span = document.createElement('span');
+                        span.className = 'poem-char punctuation';
+                        span.textContent = char;
+                        lineDiv.appendChild(span);
+                        continue;
+                    }
+                    const span = document.createElement('span');
+                    span.className = 'poem-char';
+                    span.textContent = char;
+                    span.dataset.globalIndex = globalIdx;
+                    span.id = `poem-char-${globalIdx}`;
+                    lineDiv.appendChild(span);
+                    globalIdx++;
+                }
+                poemArea.appendChild(lineDiv);
+            });
+        }
+
+        function findGlobalIndex(lineIdx, charIdx) {
+            let count = 0;
+            for (let li = 0; li < lineIdx; li++) {
+                count += POEMS[currentLevel].lines[li].length;
+            }
+            return count + charIdx;
+        }
+
+        // 渲染三层（无标签，叠放）
+        function renderAllLayers(lines) {
+            piecesArea.innerHTML = '';
+            layerPieceContainers = [];
+
+            for (let layer = 0; layer < totalLayers; layer++) {
+                const layerDiv = document.createElement('div');
+                layerDiv.className = 'piece-layer';
+                layerDiv.dataset.layerIndex = layer;
+
+                const indices = Array.from(layerUnsolved[layer]);
+                shuffleArray(indices);
+
+                indices.forEach(charIdx => {
+                    const charObj = currentPoemChars[charIdx];
+                    const ch = charObj.char;
+                    const parts = getCharParts(ch);
+
+                    parts.forEach((partStr, partIndex) => {
+                        const pieceEl = document.createElement('div');
+                        pieceEl.className = 'piece';
+                        pieceEl.dataset.char = ch;
+                        pieceEl.dataset.charIndex = charIdx;
+                        pieceEl.dataset.partIndex = partIndex;
+                        pieceEl.dataset.layer = layer;
+
+                        const span = document.createElement('span');
+                        span.className = 'part';
+                        span.textContent = partStr;
+                        pieceEl.appendChild(span);
+
+                        pieceEl.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            handlePartClick(pieceEl, charIdx, layer);
+                        });
+
+                        layerDiv.appendChild(pieceEl);
+                        charPieceEls[charIdx].push(pieceEl);
+                    });
+                });
+
+                piecesArea.appendChild(layerDiv);
+                layerPieceContainers.push(layerDiv);
+            }
+        }
+
+        function shuffleArray(arr) {
+            for (let i = arr.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [arr[i], arr[j]] = [arr[j], arr[i]];
+            }
+        }
+
+        // 更新三层状态：叠放，只有当前层亮
+        function updateLayerStates() {
+            layerPieceContainers.forEach((container, layer) => {
+                container.classList.remove('active', 'locked', 'completed');
+                if (layer < currentLayer) {
+                    container.classList.add('completed');
+                } else if (layer === currentLayer) {
+                    container.classList.add('active');
+                } else {
+                    container.classList.add('locked');
+                }
+            });
+        }
+
+        // ================= 点击部件 =================
+        function handlePartClick(pieceEl, charIdx, layer) {
+            if (layer !== currentLayer) return;
+            if (currentPoemChars[charIdx].lit) return;
+
+            // 如果已经选中，再点一下取消选中
+            if (pieceEl.classList.contains('selected')) {
+                pieceEl.classList.remove('selected');
+                charProgress[charIdx] = Math.max(0, charProgress[charIdx] - 1);
+                return;
+            }
+
+            // 选中
+            pieceEl.classList.add('selected');
+            charProgress[charIdx]++;
+
+            const ch = currentPoemChars[charIdx].char;
+            const totalParts = getCharParts(ch).length;
+
+            // 检查是否集齐
+            if (charProgress[charIdx] >= totalParts) {
+                completeChar(charIdx, layer);
+            }
+        }
+        // ================= 完成一个字 =================
+        function completeChar(charIdx, layer) {
+            const char = currentPoemChars[charIdx].char;
+            const targetSpan = document.getElementById(`poem-char-${charIdx}`);
+            if (!targetSpan) return;
+
+            const pieceEls = charPieceEls[charIdx];
+            if (!pieceEls || pieceEls.length === 0) return;
+
+            const firstPiece = pieceEls[0];
+            const pieceRect = firstPiece.getBoundingClientRect();
+            const targetRect = targetSpan.getBoundingClientRect();
+
+            const flyEl = document.createElement('div');
+            flyEl.className = 'fly-char';
+            flyEl.textContent = char;
+            flyEl.style.left = pieceRect.left + pieceRect.width / 2 - 20 + 'px';
+            flyEl.style.top = pieceRect.top + pieceRect.height / 2 - 20 + 'px';
+            document.body.appendChild(flyEl);
+
+            requestAnimationFrame(() => {
+                flyEl.style.left = targetRect.left + targetRect.width / 2 - 20 + 'px';
+                flyEl.style.top = targetRect.top + targetRect.height / 2 - 20 + 'px';
+                flyEl.style.opacity = '0.2';
+                flyEl.style.transform = 'scale(0.8)';
+            });
+
+            setTimeout(() => {
+                flyEl.remove();
+
+                currentPoemChars[charIdx].lit = true;
+                layerUnsolved[layer].delete(charIdx);
+                if (targetSpan) targetSpan.classList.add('lit');
+
+                pieceEls.forEach(el => {
+                    if (el.parentNode) el.remove();
+                });
+
+                // 当前层是否全部拼完
+                if (layerUnsolved[layer].size === 0) {
+                    if (layer === totalLayers - 1) {
+                        stopTimer();
+                        winModal.classList.remove('hidden-modal');
+                    } else {
+                        currentLayer++;
+                        updateLayerStates();
+                    }
+                }
+            }, 450);
+        }
+
+        // ================= 控制 =================
+        function restartLevel() {
+            enterLevel(currentLevel);
+        }
+
+        function exitToSelect() {
+            stopTimer();
+            resetTimer();
+            winModal.classList.add('hidden-modal');
+            showScreen(selectScreen);
+        }
+
+        function goToNextLevel() {
+            winModal.classList.add('hidden-modal');
+            let next = currentLevel + 1;
+            if (next >= POEMS.length) next = 0;
+            currentLevel = next;
+            enterLevel(currentLevel);
+        }
+
+        // ================= 初始化 =================
+        function init() {
+            buildLevelButtons();
+            startBtn.addEventListener('click', () => showScreen(selectScreen));
+            document.getElementById('backToMainBtn').addEventListener('click', () => {
+                showScreen(mainScreen);
+            });
+            restartBtn.addEventListener('click', restartLevel);
+            exitBtn.addEventListener('click', exitToSelect);
+            nextLevelBtn.addEventListener('click', goToNextLevel);
+            showScreen(mainScreen);
+        }
+
+        init();
+    })();
+</script>
+</body>
+</html>
