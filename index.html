@@ -321,14 +321,20 @@
             left: 4px;
             right: 4px;
             bottom: 4px;
-            display: grid;
-            grid-template-columns: repeat(8, 1fr);
-            grid-template-rows: repeat(9, 1fr);
-            gap: 0;
+            display: flex;
+            justify-content: center;    /* 网格水平居中 */
+            align-items: center;        /* 网格垂直居中 */
             padding: 0;
             border-radius: 18px;
             transition: opacity 0.35s, filter 0.35s;
             overflow: hidden;
+        }
+
+        .piece-grid {
+            display: grid;
+            gap: 0;
+            max-width: 100%;
+            max-height: 100%;
         }
 
         .piece-layer.active {
@@ -366,8 +372,13 @@
             border: 1px solid #cdba9f;
             margin: 0;
             box-sizing: border-box;
-            width: auto;
-            height: auto;
+            width: 100%;
+            height: 100%;
+        }
+
+        .piece.hidden {
+            visibility: hidden;    /* 隐藏但保留位置 */
+            pointer-events: none;
         }
 
         .piece:active {
@@ -380,6 +391,19 @@
             border-color: #b8860b;
             box-shadow: 0 3px 0 #a67c00, 0 0 0 3px rgba(200, 150, 50, 0.5);
             transform: translateY(-2px) scale(1.05);
+        }
+
+        /* 提示高亮 */
+        .piece.hint-highlight {
+            background: #ffe4a0;
+            border-color: #d4a017;
+            box-shadow: 0 3px 0 #a67c00, 0 0 0 4px rgba(255, 200, 100, 0.6);
+            animation: hint-pulse 0.8s ease-in-out infinite alternate;
+        }
+
+        @keyframes hint-pulse {
+            from { transform: scale(1); }
+            to { transform: scale(1.08); }
         }
 
         .piece .part {
@@ -993,20 +1017,7 @@
 
             layerUnsolved = layerUnsolved.map(arr => new Set(arr));
             totalLayers = layerUnsolved.length;
-                        // 为每个部件分配固定格子位置
-            piecePositions = {};
-            let gridIndex = 0;
-            allIndices.forEach(idx => {
-                const charObj = currentPoemChars[idx];
-                const parts = getCharParts(charObj.char);
-                piecePositions[idx] = [];
-                parts.forEach((partStr, partIndex) => {
-                    const col = (gridIndex % 8) + 1;
-                    const row = Math.floor(gridIndex / 8) + 1;
-                    piecePositions[idx][partIndex] = { col, row };
-                    gridIndex++;
-                });
-            });
+
 
             renderPoem(poem.lines);
             renderAllLayers(poem.lines);
@@ -1058,43 +1069,87 @@
                 const indices = Array.from(layerUnsolved[layer]);
                 shuffleArray(indices);
 
+                // 1. 先把这一层所有部件收集到一个数组里
+                const allParts = [];
                 indices.forEach(charIdx => {
                     const charObj = currentPoemChars[charIdx];
                     const ch = charObj.char;
                     const parts = getCharParts(ch);
 
                     parts.forEach((partStr, partIndex) => {
-                        const pieceEl = document.createElement('div');
-                        pieceEl.className = 'piece';
-                        pieceEl.dataset.char = ch;
-                        pieceEl.dataset.charIndex = charIdx;
-                        pieceEl.dataset.partIndex = partIndex;
-                        pieceEl.dataset.layer = layer;
-
-                        const span = document.createElement('span');
-                        span.className = 'part';
-                        span.textContent = partStr;
-                        pieceEl.appendChild(span);
-
-                        // 固定格子位置
-                        const gridPos = piecePositions[charIdx][partIndex];
-                        pieceEl.style.gridColumn = gridPos.col;
-                        pieceEl.style.gridRow = gridPos.row;
-
-                        pieceEl.addEventListener('click', (e) => {
-                            e.stopPropagation();
-                            handlePartClick(pieceEl, charIdx, layer);
+                        allParts.push({
+                            charIdx: charIdx,
+                            char: ch,
+                            partStr: partStr,
+                            partIndex: partIndex,
+                            layer: layer
                         });
-
-                        layerDiv.appendChild(pieceEl);
-                        charPieceEls[charIdx].push(pieceEl);
                     });
                 });
 
+                // 2. 打乱所有部件的顺序
+                shuffleArray(allParts);
+
+                // 3. 计算网格行列数
+                const totalParts = allParts.length;
+                let cols, rows;
+                const ratio = 8 / 9;
+                let bestDiff = Infinity;
+                for (let c = 1; c <= totalParts; c++) {
+                    const r = Math.ceil(totalParts / c);
+                    const diff = Math.abs(c / r - ratio);
+                    if (diff < bestDiff) {
+                        bestDiff = diff;
+                        cols = c;
+                        rows = r;
+                    }
+                }
+
+                // 4. 创建网格容器
+                const gridDiv = document.createElement('div');
+                gridDiv.className = 'piece-grid';
+                gridDiv.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+                gridDiv.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
+
+                const layerRect = piecesArea.getBoundingClientRect();
+                const maxW = layerRect.width - 20;
+                const maxH = layerRect.height - 20;
+                const cellW = maxW / cols;
+                const cellH = maxH / rows;
+                const cellSize = Math.min(cellW, cellH);
+
+                gridDiv.style.width = `${cols * cellSize}px`;
+                gridDiv.style.height = `${rows * cellSize}px`;
+
+                // 5. 按打乱后的顺序生成部件
+                allParts.forEach(partObj => {
+                    const pieceEl = document.createElement('div');
+                    pieceEl.className = 'piece';
+                    pieceEl.dataset.char = partObj.char;
+                    pieceEl.dataset.charIndex = partObj.charIdx;
+                    pieceEl.dataset.partIndex = partObj.partIndex;
+                    pieceEl.dataset.layer = layer;
+
+                    const span = document.createElement('span');
+                    span.className = 'part';
+                    span.textContent = partObj.partStr;
+                    pieceEl.appendChild(span);
+
+                    pieceEl.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        handlePartClick(pieceEl, partObj.charIdx, layer);
+                    });
+
+                    gridDiv.appendChild(pieceEl);
+                    charPieceEls[partObj.charIdx].push(pieceEl);
+                });
+
+                layerDiv.appendChild(gridDiv);
                 piecesArea.appendChild(layerDiv);
                 layerPieceContainers.push(layerDiv);
             }
         }
+
 
         function shuffleArray(arr) {
             for (let i = arr.length - 1; i > 0; i--) {
@@ -1121,6 +1176,7 @@
             if (layer !== currentLayer) return;
             if (currentPoemChars[charIdx].lit) return;
             if (layerUnsolved[layer].size === 0) return;
+            if (pieceEl.classList.contains('hidden')) return;   // 隐藏的格子不可点
 
             if (pieceEl.classList.contains('selected')) {
                 pieceEl.classList.remove('selected');
@@ -1138,7 +1194,6 @@
         function tryMatchSelected() {
             const selectedChars = selectedPieces.map(el => el.querySelector('.part').textContent);
 
-            // 1. 检查能否拼出某个字
             for (let charIdx of layerUnsolved[currentLayer]) {
                 const ch = currentPoemChars[charIdx].char;
                 const parts = getCharParts(ch);
@@ -1152,7 +1207,6 @@
                 }
             }
 
-            // 2. 检查候选池是否还有可能拼出某个字
             if (!canMatchAnyPrefix(selectedChars)) {
                 selectedPieces.forEach(el => el.classList.remove('selected'));
                 selectedPieces = [];
@@ -1163,7 +1217,6 @@
             for (let charIdx of layerUnsolved[currentLayer]) {
                 const ch = currentPoemChars[charIdx].char;
                 const parts = getCharParts(ch);
-                // 条件：候选池里的每个部件都属于这个字，且候选池长度不超过该字的部件数
                 if (selectedChars.length <= parts.length &&
                     selectedChars.every(p => parts.includes(p))) {
                     return true;
@@ -1171,6 +1224,7 @@
             }
             return false;
         }
+
 
         // ================= 完成一个字 =================
         function completeChar(charIdx, layer) {
@@ -1206,18 +1260,19 @@
                 layerUnsolved[layer].delete(charIdx);
                 if (targetSpan) targetSpan.classList.add('lit');
 
-                // 1. 移除这个字的所有部件
+                // 1. 不删除格子，改为隐藏（保留位置）
                 allPieces.forEach(el => {
-                    if (el.parentNode) el.remove();
+                    el.classList.add('hidden');    // 隐藏但保留位置
+                    el.classList.remove('selected');
                 });
 
-                // 2. 清空所有选中状态的部件（包括不属于这个字的）
+                // 2. 清空所有选中状态的部件
                 selectedPieces.forEach(el => {
                     el.classList.remove('selected');
                 });
                 selectedPieces = [];
 
-                // 3. 额外兜底：移除页面上所有 .selected 的 class
+                // 3. 兜底：清除所有 .selected
                 document.querySelectorAll('.piece.selected').forEach(el => {
                     el.classList.remove('selected');
                 });
@@ -1254,6 +1309,45 @@
             enterLevel(currentLevel);
         }
 
+                // ================= 提示功能 =================
+        function showHint() {
+            // 当前层没有未拼的字，忽略
+            if (layerUnsolved[currentLayer].size === 0) return;
+
+            // 1. 找一个当前层里「所有部件都还在」的字
+            //    部件的判断：这个字的所有部件元素都还没被隐藏（没被拼掉）
+            for (let charIdx of layerUnsolved[currentLayer]) {
+                const ch = currentPoemChars[charIdx].char;
+                const parts = getCharParts(ch);
+                const pieceEls = charPieceEls[charIdx] || [];
+
+                // 过滤掉已隐藏的格子
+                const availablePieces = pieceEls.filter(el => !el.classList.contains('hidden'));
+
+                // 如果这个字的所有部件都还在
+                if (availablePieces.length === parts.length) {
+                    // 2. 高亮这些部件
+                    // 先清空之前的选中状态
+                    selectedPieces.forEach(el => el.classList.remove('selected'));
+                    selectedPieces = [];
+
+                    // 给这些部件加高亮（但不加入 selectedPieces，让玩家自己点）
+                    availablePieces.forEach(el => {
+                        el.classList.add('hint-highlight');
+                    });
+
+                    // 3. 3 秒后自动取消高亮
+                    setTimeout(() => {
+                        availablePieces.forEach(el => {
+                            el.classList.remove('hint-highlight');
+                        });
+                    }, 3000);
+
+                    return;
+                }
+            }
+        }
+
         // ================= 初始化 =================
         function init() {
             buildLevelButtons();
@@ -1264,6 +1358,7 @@
             restartBtn.addEventListener('click', restartLevel);
             exitBtn.addEventListener('click', exitToSelect);
             nextLevelBtn.addEventListener('click', goToNextLevel);
+            document.getElementById('hintBtn').addEventListener('click', showHint);
             showScreen(mainScreen);
         }
 
