@@ -395,20 +395,21 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            background: #fcf7ed;
-            border-radius: 6px;
+            background: rgba(245, 240, 230, 0.85);   /* 浅灰米色，微透明 */
+            border-radius: 4px;                       /* 小圆角，接近直角 */
             padding: 0;
-            box-shadow: 0 2px 0 #a58d73;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);  /* 很淡的阴影 */
             cursor: pointer;
             transition: all 0.1s ease;
             font-size: clamp(14px, 4.2vw, 19px);
-            color: #3f3226;
-            font-weight: 600;
-            border: 1px solid #cdba9f;
+            color: #2e241b;                          /* 深褐色，像墨 */
+            font-weight: 700;
+            border: 1px solid rgba(180, 160, 130, 0.4);  /* 淡边框 */
             margin: 0;
             box-sizing: border-box;
             width: 100%;
             height: 100%;
+            font-family: 'KaiTi', 'STKaiti', '华文楷体', serif;   /* 楷体，有毛笔感 */
         }
 
         .piece.hidden {
@@ -422,17 +423,22 @@
         }
 
         .piece.selected {
-            background: #ffd98a;
-            border-color: #b8860b;
-            box-shadow: 0 3px 0 #a67c00, 0 0 0 3px rgba(200, 150, 50, 0.5);
-            transform: translateY(-2px) scale(1.05);
+            background: rgba(180, 140, 90, 0.9);      /* 墨褐色 */
+            border-color: #8a6a3e;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            transform: translateY(-1px) scale(1.03);
+            color: #fff;
+        }
+
+        .piece.selected .part {
+            color: #fff;
         }
 
         /* 提示高亮 */
         .piece.hint-highlight {
-            background: #ffe4a0;
+            background: rgba(255, 220, 150, 0.9);
             border-color: #d4a017;
-            box-shadow: 0 3px 0 #a67c00, 0 0 0 4px rgba(255, 200, 100, 0.6);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
             animation: hint-pulse 0.8s ease-in-out infinite alternate;
         }
 
@@ -445,6 +451,10 @@
             display: inline-block;
             font-size: clamp(15px, 4.5vw, 20px);
             line-height: 1;
+            font-weight: 700;
+            font-family: 'KaiTi', 'STKaiti', '华文楷体', serif;
+            letter-spacing: 1px;
+            color: #2e241b;
         }
 
         .fly-char {
