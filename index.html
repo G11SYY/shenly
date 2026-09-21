@@ -395,22 +395,35 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            background: rgba(245, 240, 230, 0.85);   /* 浅灰米色，微透明 */
-            border-radius: 4px;                       /* 小圆角，接近直角 */
+            background: #fcf7ed;
+            border-radius: 6px;
             padding: 0;
-            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);  /* 很淡的阴影 */
+            box-shadow: 0 2px 0 #a58d73;
             cursor: pointer;
             transition: all 0.1s ease;
-            font-size: clamp(14px, 4.2vw, 19px);
-            color: #2e241b;                          /* 深褐色，像墨 */
-            font-weight: 700;
-            border: 1px solid rgba(180, 160, 130, 0.4);  /* 淡边框 */
+            font-size: clamp(22px, 6.5vw, 28px);
+            color: #3f3226;
+            font-weight: 900;                  /* 从 700 改成 900，最粗 */
+            border: 1px solid #cdba9f;
             margin: 0;
             box-sizing: border-box;
             width: 100%;
             height: 100%;
-            font-family: 'KaiTi', 'STKaiti', '华文楷体', serif;   /* 楷体，有毛笔感 */
+            font-family: 'KaiTi', 'STKaiti', '华文楷体', serif;
+            -webkit-text-stroke: 0.5px #2e241b;  /* 描边，进一步加粗 */
         }
+
+        .piece .part {
+            display: inline-block;
+            font-size: clamp(22px, 6.5vw, 28px);
+            line-height: 1;
+            font-weight: 900;                  /* 从 700 改成 900 */
+            font-family: 'KaiTi', 'STKaiti', '华文楷体', serif;
+            letter-spacing: 1px;
+            color: #2e241b;
+            -webkit-text-stroke: 0.5px #2e241b;  /* 描边，进一步加粗 */
+        }
+
 
         .piece.hidden {
             visibility: hidden;    /* 隐藏但保留位置 */
@@ -447,15 +460,6 @@
             to { transform: scale(1.08); }
         }
 
-        .piece .part {
-            display: inline-block;
-            font-size: clamp(15px, 4.5vw, 20px);
-            line-height: 1;
-            font-weight: 700;
-            font-family: 'KaiTi', 'STKaiti', '华文楷体', serif;
-            letter-spacing: 1px;
-            color: #2e241b;
-        }
 
         .fly-char {
             position: fixed;
@@ -654,7 +658,7 @@
                 currentLayer: currentLayer,
                 litChars: currentPoemChars.map(c => c.lit),
                 layerUnsolved: layerUnsolved.map(set => Array.from(set)),
-                piecePositions: piecePositions,
+                piecePositions: piecePositions,     // 保存位置
                 secondsElapsed: secondsElapsed,
                 totalLayers: totalLayers
             };
@@ -810,18 +814,43 @@
                 document.querySelector('.bottom-buttons').style.display = 'none';
                 return;
             }
-
             // 如果有当前关的进度，恢复
             if (progress && progress.level === levelIndex) {
                 currentLayer = progress.currentLayer;
                 totalLayers = progress.totalLayers;
-                piecePositions = progress.piecePositions;
+                piecePositions = progress.piecePositions || {};
 
                 progress.litChars.forEach((lit, idx) => {
                     if (lit) currentPoemChars[idx].lit = true;
                 });
 
                 layerUnsolved = progress.layerUnsolved.map(arr => new Set(arr));
+
+                // 如果 piecePositions 为空，重新分配
+                if (Object.keys(piecePositions).length === 0) {
+                    for (let layer = 0; layer < totalLayers; layer++) {
+                        const indices = Array.from(layerUnsolved[layer] || []);
+                        shuffleArray(indices);
+                        const allParts = [];
+                        indices.forEach(charIdx => {
+                            const parts = getCharParts(currentPoemChars[charIdx].char);
+                            parts.forEach((partStr, partIndex) => {
+                                allParts.push({ charIdx, partIndex });
+                            });
+                        });
+                        shuffleArray(allParts);
+                        allParts.forEach((partObj, index) => {
+                            const charIdx = partObj.charIdx;
+                            const partIndex = partObj.partIndex;
+                            if (!piecePositions[charIdx]) piecePositions[charIdx] = [];
+                            piecePositions[charIdx][partIndex] = {
+                                layer: layer,
+                                col: index % 8,
+                                row: Math.floor(index / 8)
+                            };
+                        });
+                    }
+                }
 
                 renderPoem(poem.lines);
                 currentPoemChars.forEach((c, idx) => {
@@ -877,6 +906,42 @@
             layerUnsolved = layerUnsolved.map(arr => new Set(arr));
             totalLayers = layerUnsolved.length;
 
+            // 为每个部件分配固定位置（同一字的部件分散）
+            piecePositions = {};
+            for (let layer = 0; layer < totalLayers; layer++) {
+                const indices = Array.from(layerUnsolved[layer]);
+                shuffleArray(indices);
+
+                // 1. 先把这一层所有部件收集到一个数组里
+                const allParts = [];
+                indices.forEach(charIdx => {
+                    const charObj = currentPoemChars[charIdx];
+                    const parts = getCharParts(charObj.char);
+                    parts.forEach((partStr, partIndex) => {
+                        allParts.push({
+                            charIdx: charIdx,
+                            partIndex: partIndex
+                        });
+                    });
+                });
+
+                // 2. 打乱所有部件的顺序（这样同一字的部件就不挨着了）
+                shuffleArray(allParts);
+
+                // 3. 按打乱后的顺序分配位置
+                piecePositions = piecePositions || {};
+                allParts.forEach((partObj, index) => {
+                    const charIdx = partObj.charIdx;
+                    const partIndex = partObj.partIndex;
+                    if (!piecePositions[charIdx]) piecePositions[charIdx] = [];
+                    piecePositions[charIdx][partIndex] = {
+                        layer: layer,
+                        col: index % 8,
+                        row: Math.floor(index / 8)
+                    };
+                });
+            }
+
             renderPoem(poem.lines);
             renderAllLayers(poem.lines);
             updateLayerStates();
@@ -925,45 +990,11 @@
                 layerDiv.dataset.layerIndex = layer;
 
                 const indices = Array.from(layerUnsolved[layer]);
-                shuffleArray(indices);
 
-                // 1. 先把这一层所有部件收集到一个数组里
-                const allParts = [];
-                indices.forEach(charIdx => {
-                    const charObj = currentPoemChars[charIdx];
-                    const ch = charObj.char;
-                    const parts = getCharParts(ch);
+                // 固定网格：8 列 × 9 行
+                const cols = 8;
+                const rows = 9;
 
-                    parts.forEach((partStr, partIndex) => {
-                        allParts.push({
-                            charIdx: charIdx,
-                            char: ch,
-                            partStr: partStr,
-                            partIndex: partIndex,
-                            layer: layer
-                        });
-                    });
-                });
-
-                // 2. 打乱所有部件的顺序
-                shuffleArray(allParts);
-
-                // 3. 计算网格行列数
-                const totalParts = allParts.length;
-                let cols, rows;
-                const ratio = 8 / 9;
-                let bestDiff = Infinity;
-                for (let c = 1; c <= totalParts; c++) {
-                    const r = Math.ceil(totalParts / c);
-                    const diff = Math.abs(c / r - ratio);
-                    if (diff < bestDiff) {
-                        bestDiff = diff;
-                        cols = c;
-                        rows = r;
-                    }
-                }
-
-                // 4. 创建网格容器
                 const gridDiv = document.createElement('div');
                 gridDiv.className = 'piece-grid';
                 gridDiv.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
@@ -979,27 +1010,46 @@
                 gridDiv.style.width = `${cols * cellSize}px`;
                 gridDiv.style.height = `${rows * cellSize}px`;
 
-                // 5. 按打乱后的顺序生成部件
-                allParts.forEach(partObj => {
-                    const pieceEl = document.createElement('div');
-                    pieceEl.className = 'piece';
-                    pieceEl.dataset.char = partObj.char;
-                    pieceEl.dataset.charIndex = partObj.charIdx;
-                    pieceEl.dataset.partIndex = partObj.partIndex;
-                    pieceEl.dataset.layer = layer;
+                // 按 piecePositions 渲染
+                indices.forEach(charIdx => {
+                    const charObj = currentPoemChars[charIdx];
+                    const ch = charObj.char;
+                    const parts = getCharParts(ch);
 
-                    const span = document.createElement('span');
-                    span.className = 'part';
-                    span.textContent = partObj.partStr;
-                    pieceEl.appendChild(span);
+                    parts.forEach((partStr, partIndex) => {
+                        let pos = piecePositions[charIdx] && piecePositions[charIdx][partIndex];
+                        // 如果没有位置，动态分配一个
+                        if (!pos) {
+                            pos = { layer: layer, col: gridDiv.children.length % 8, row: Math.floor(gridDiv.children.length / 8) };
+                            if (!piecePositions[charIdx]) piecePositions[charIdx] = [];
+                            piecePositions[charIdx][partIndex] = pos;
+                        }
 
-                    pieceEl.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        handlePartClick(pieceEl, partObj.charIdx, layer);
+                        const pieceEl = document.createElement('div');
+                        pieceEl.className = 'piece';
+                        pieceEl.dataset.char = ch;
+                        pieceEl.dataset.charIndex = charIdx;
+                        pieceEl.dataset.partIndex = partIndex;
+                        pieceEl.dataset.layer = layer;
+
+                        // 固定位置
+                        pieceEl.style.gridColumn = pos.col + 1;
+                        pieceEl.style.gridRow = pos.row + 1;
+
+                        const span = document.createElement('span');
+                        span.className = 'part';
+                        span.textContent = partStr;
+                        pieceEl.appendChild(span);
+
+                        // 用 onclick 替代 addEventListener，避免重复绑定
+                        pieceEl.onclick = (e) => {
+                            e.stopPropagation();
+                            handlePartClick(pieceEl, charIdx, layer);
+                        };
+
+                        gridDiv.appendChild(pieceEl);
+                        charPieceEls[charIdx].push(pieceEl);
                     });
-
-                    gridDiv.appendChild(pieceEl);
-                    charPieceEls[partObj.charIdx].push(pieceEl);
                 });
 
                 layerDiv.appendChild(gridDiv);
@@ -1050,6 +1100,8 @@
 
         // ================= 候选池匹配 =================
         function tryMatchSelected() {
+            if (selectedPieces.length === 0) return;
+
             const selectedChars = selectedPieces.map(el => el.querySelector('.part').textContent);
 
             for (let charIdx of layerUnsolved[currentLayer]) {
@@ -1059,8 +1111,9 @@
                 if (parts.length === selectedChars.length &&
                     parts.every(p => selectedChars.includes(p)) &&
                     selectedChars.every(p => parts.includes(p))) {
-                    completeChar(charIdx, currentLayer);
+                    // 先清空候选池，防止重复匹配
                     selectedPieces = [];
+                    completeChar(charIdx, currentLayer);
                     return;
                 }
             }
@@ -1086,12 +1139,18 @@
 
         // ================= 完成一个字 =================
         function completeChar(charIdx, layer) {
+            // 如果这个字已经点亮，直接返回（防止重复触发）
+            if (currentPoemChars[charIdx].lit) return;
+
             const char = currentPoemChars[charIdx].char;
             const targetSpan = document.getElementById(`poem-char-${charIdx}`);
             if (!targetSpan) return;
 
             const allPieces = charPieceEls[charIdx] || [];
             if (allPieces.length === 0) return;
+
+            // 标记为已点亮，防止重复触发
+            currentPoemChars[charIdx].lit = true;
 
             const firstPiece = allPieces[0];
             const pieceRect = firstPiece.getBoundingClientRect();
@@ -1114,7 +1173,6 @@
             setTimeout(() => {
                 flyEl.remove();
 
-                currentPoemChars[charIdx].lit = true;
                 layerUnsolved[layer].delete(charIdx);
                 if (targetSpan) targetSpan.classList.add('lit');
 
